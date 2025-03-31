@@ -23,6 +23,17 @@ class MyPhysicsGame extends Forge2DGame {
   late final XmlSpriteSheet elements;
   late final XmlSpriteSheet tiles;
 
+  int attemptCounter = 11;  // Inicializamos con 10 intentos.
+  bool gameOver = false;
+  TextComponent attemptText = TextComponent(
+    text: 'Num. Intentos: 10',
+    position: Vector2(10, -20),
+    anchor: Anchor.topLeft,
+    textRenderer: TextPaint(
+      style: const TextStyle(color: Colors.black, fontSize: 3),
+    ),
+  );
+
   @override
   FutureOr<void> onLoad() async {
     final backgroundImage = await images.load('colored_desert.png');
@@ -47,8 +58,9 @@ class MyPhysicsGame extends Forge2DGame {
 
     await world.add(Background(sprite: Sprite(backgroundImage)));
     await addGround();
-    unawaited(addBricks().then((_) => addEnemies())); 
-    await addPlayer(); 
+    unawaited(addBricks().then((_) => addEnemies()));
+    await addPlayer();
+    await world.add(attemptText);
 
     return super.onLoad();
   }
@@ -92,25 +104,49 @@ class MyPhysicsGame extends Forge2DGame {
     }
   }
 
-  Future<void> addPlayer() async => world.add( 
-        Player(
-          Vector2(camera.visibleWorldRect.left * 2 / 3, 0),
-          aliens.getSprite(PlayerColor.randomColor.fileName),
+  Future<void> addPlayer() async {
+    if (gameOver) return;
+
+    attemptCounter--;  // Restamos 1 al contador de intentos.
+    attemptText.text = 'Num. Intentos: $attemptCounter';
+
+    if (attemptCounter <= 0) {
+      gameOver = true;
+      world.add(
+        TextComponent(
+          text: 'You Lose :(',
+          anchor: Anchor.center,
+          position: Vector2(0.5, 0.5),
+          textRenderer: TextPaint(
+            style: TextStyle(color: Colors.red, fontSize: 16),
+          ),
         ),
       );
+      return;
+    }
+
+    await world.add(
+      Player(
+        Vector2(camera.visibleWorldRect.left * 2 / 3, 0),
+        aliens.getSprite(PlayerColor.randomColor.fileName),
+      ),
+    );
+  }
 
   @override
   void update(double dt) {
     super.update(dt);
-    if (isMounted &&                                       // Modify from here...
+    if (isMounted &&
+        !gameOver &&
         world.children.whereType<Player>().isEmpty &&
         world.children.whereType<Enemy>().isNotEmpty) {
       addPlayer();
     }
     if (isMounted &&
+        !gameOver &&
         enemiesFullyAdded &&
         world.children.whereType<Enemy>().isEmpty &&
-        world.children.whereType<TextComponent>().isEmpty) {
+        world.children.whereType<TextComponent>().where((t) => t.text == 'You win!').isEmpty) {
       world.addAll(
         [
           (position: Vector2(0.5, 0.5), color: Colors.white),
@@ -146,5 +182,5 @@ class MyPhysicsGame extends Forge2DGame {
       await Future<void>.delayed(const Duration(seconds: 1));
     }
     enemiesFullyAdded = true;
-  }       
+  }
 }
